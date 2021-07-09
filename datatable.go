@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"strconv"
+	"strings"
 )
 
 type datatable struct {
@@ -60,7 +61,7 @@ func (d *datatable) generate() {
 
 	d.cardinalityFiltered = countColFilt
 	//sort data
-	sortedData := d.customSort()
+	//sortedData := d.customSort()
 	skip := d.requestValues.IDisplayStart
 	limit := d.requestValues.IDisplayLength
 
@@ -68,7 +69,9 @@ func (d *datatable) generate() {
 	opt.Skip = &skip
 	opt.Limit = &limit
 	opt.SetProjection(bson.M{"_id": 0})
-	opt.SetSort(bson.M{sortedData["column_name"].(string): sortedData["sort"]})
+	if sortedData := d.customSort(); sortedData != nil {
+		opt.SetSort(bson.M{sortedData["column_name"].(string): sortedData["sort"]})
+	}
 
 	cur, err := d.collection.Find(context.TODO(), d.filterSearch, opt)
 	if err != nil {
@@ -91,6 +94,26 @@ func (d *datatable) generate() {
 
 func (d *datatable) customSort() map[string]interface{} {
 	if d.requestValues.ISortCol0 != "" && d.requestValues.ISortingCols > 0 {
+		if index, err := strconv.Atoi(d.requestValues.ISortCol0); err != nil {
+			return nil
+		} else {
+			var dir int
+			switch strings.ToUpper(d.requestValues.SSortDir0) {
+			case "ASC":
+				dir = 1
+			case "DESC":
+				dir = -1
+			default:
+				return nil
+			}
+			return map[string]interface{}{"column_name": d.columns[index], "sort": dir}
+		}
+	}
+	return nil
+}
+/*
+func (d *datatable) customSort() map[string]interface{} {
+	if d.requestValues.ISortCol0 != "" && d.requestValues.ISortingCols > 0 {
 		index, err := strconv.Atoi(d.requestValues.ISortCol0)
 		if err != nil {
 			return map[string]interface{}{}
@@ -100,7 +123,6 @@ func (d *datatable) customSort() map[string]interface{} {
 	}
 	return nil
 }
-
 func isReverse(strDirection string) int {
 	if strDirection == "desc" {
 		return -1
@@ -108,6 +130,7 @@ func isReverse(strDirection string) int {
 		return 1
 	}
 }
+*/
 
 func (d *datatable) result() Data {
 	data := Data{
